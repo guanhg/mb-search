@@ -1,0 +1,44 @@
+*.swp
+target
+# ===================== System cache ==========================
+.DS_Store
+
+# ===================== JavaScript =========================
+node_modules/
+npm-debug.log
+# ======================== IDE =============================
+# IDE
+*~
+*.swp
+# PyCharm
+.idea/
+.ropeproject
+.project
+
+
+# ctags -R
+tags
+urls
+*_urls
+
+# ===================== Project specific ===================
+# Project specific
+urls.ini
+test_xml
+list
+
+*.xlsx
+*.xls
+*.iml
+nohup.out
+
+tests/data/
+twistd.pid
+setup.py
+
+proxy_list
+tmp
+
+# === for java project =====
+.gradle/
+out/

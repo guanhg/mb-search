@@ -1,0 +1,59 @@
+version: "2"
+services:
+
+  indexer:
+    build:
+      context: .
+      dockerfile: Dockerfile-indexer
+    volumes:
+      - ./data:/home/search/data
+    ports:
+      - "62000:873"
+    ulimits:
+      as: 40802189312
+      nofile: 51200
+    restart: unless-stopped
+    hostname: indexer
+    environment:
+      POSTGRES_HOST: 10.0.2.15
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: musicbrainz_db
+      POSTGRES_USER: musicbrainz
+      POSTGRES_PASSWD: musicbrainz
+      DEPLOY_ENV: "prod"
+      SERVICE_62000_NAME: "search-indexer"
+      SERVICE_62000_CHECK_TCP: "true"
+      SERVICE_62000_CHECK_INTERVAL: "15s"
+      SERVICE_62000_CHECK_TIMEOUT: "3s"
+
+  server:
+    build: 
+      context: .
+      dockerfile: Dockerfile-server
+    ports:
+      - "62001:8080"
+    ulimits:
+      as: 40802189312
+      nofile: 51200
+    restart: unless-stopped
+    hostname: server
+    environment:
+      DEPLOY_ENV: "prod"
+      SERVICE_62001_NAME: "search-server"
+      SERVICE_62001_CHECK_TCP: "true"
+      SERVICE_62001_CHECK_INTERVAL: "15s"
+      SERVICE_62001_CHECK_TIMEOUT: "3s"
+
+  consul:
+    command: -server -bootstrap
+    image: progrium/consul
+    ports:
+      - "8500:8500"
+
+  registrator:
+    command: -internal consul://consul:8500
+    image: gliderlabs/registrator
+    links:
+      - consul
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock

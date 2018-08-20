@@ -1,0 +1,5 @@
+{{if service "search-indexer"}}
+{{with index (service "search-indexer") 0}}
+{{.Address}}:{{.Port}}
+{{end}}
+{{end}}

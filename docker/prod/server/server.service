@@ -1,0 +1,91 @@
+#!/bin/bash
+
+CURRENT_TS=0
+INI_FILE=/code/consul_server.ini
+
+while [ 1 ]
+do
+    if [ ! -e "$INI_FILE" ]
+    then
+        sleep 1
+        continue
+    fi
+    break
+done
+
+while [ 1 ]
+do
+    RSYNC_SERVER=`grep . $INI_FILE | awk '{$1=$1};1'`
+    echo -n "connect rsync to $RSYNC_SERVER: "
+    rsync rsync://search@$RSYNC_SERVER/data/$INDEXES_VERSION/ --list-only > /tmp/data-list
+    if [ $? != "0" ]
+    then
+	echo "Failed to get list of data sets. sleeping"
+	sleep 30 
+	continue
+    fi
+    cat /tmp/data-list
+    TS=`cat /tmp/data-list | colrm 1 46 | grep -i . | sort -rn | head -1`
+    rm /tmp/data-list
+
+    if [ "$CURRENT_TS" == "$TS" ]
+    then
+        echo "no new data. sleeping."
+        sleep 30
+        continue
+    fi
+
+    # Sync over the indexes
+    mkdir -p $SEARCH_HOME/data/$TS
+    rsync -rv rsync://search@$RSYNC_SERVER/data/$INDEXES_VERSION/$TS $SEARCH_HOME/data
+    if [ $? != "0" ]
+    then
+	echo "Failure during sync of dataset. Starting over again."
+	sleep 5
+	continue
+    fi
+
+    # If we already have a data-set, check to see if we should delay the restart
+    if [ -d "$SEARCH_HOME/data/current" ];
+    then
+        if [ -f "$SEARCH_HOME/data/$TS/restart-$PRIVATE_IP" ];
+        then
+            RESTART_TS=`cat "/home/search/data/$TS/restart-$PRIVATE_IP"`
+            echo -n "restart time: "
+            date -d @$RESTART_TS
+            echo -n "current time: "
+            date
+            echo "sleeping..."
+            while [ 1 ]
+            do
+                if [ "`date +%s`" -lt "$RESTART_TS" ];
+                then
+                    sleep 1
+                else
+                    break
+                fi
+            done
+        else
+            echo "Found no restart timestamp."
+        fi
+    fi
+
+    # remove the old data set and move the current one into place
+    rm -rf $SEARCH_HOME/data/current
+    mv $SEARCH_HOME/data/$TS $SEARCH_HOME/data/current
+    ln -fs $SEARCH_HOME/data/current $SEARCH_HOME/indexdata
+
+    CURRENT_TS=$TS
+
+    # this has got to be my favorite command EVAR
+    echo "Kill the search server... \ø/"
+    killall -9 java
+  
+    # Start the search server again
+    cd $JETTY_HOME
+    /docker-entrypoint.sh java -jar /usr/local/jetty/start.jar &
+
+    # take a well deserved break!
+    sleep 3
+
+done   
